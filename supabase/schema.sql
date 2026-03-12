@@ -1,10 +1,23 @@
--- DevEx Gamified Productivity Ticker
--- Supabase SQL Schema
+-- DevEx Gamified Productivity Ticker — v2
+-- Run this in your Supabase SQL editor
 
--- Enable UUID extension
 create extension if not exists "uuid-ossp";
 
--- Team members table
+-- ─── Work Categories ──────────────────────────────────────────────────────────
+
+create table if not exists work_categories (
+  id uuid primary key default uuid_generate_v4(),
+  name text not null,
+  emoji text not null default '📋',
+  description text not null default '',
+  base_multiplier numeric(4, 2) not null default 1.0,
+  color text not null default 'zinc',
+  is_active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+-- ─── Team Members ─────────────────────────────────────────────────────────────
+
 create table if not exists team_members (
   id uuid primary key default uuid_generate_v4(),
   name text not null,
@@ -19,7 +32,8 @@ create table if not exists team_members (
   updated_at timestamptz not null default now()
 );
 
--- Price history for sparklines / charts
+-- ─── Price History ────────────────────────────────────────────────────────────
+
 create table if not exists price_history (
   id uuid primary key default uuid_generate_v4(),
   member_id uuid not null references team_members(id) on delete cascade,
@@ -28,12 +42,14 @@ create table if not exists price_history (
   recorded_at timestamptz not null default now()
 );
 
--- Tasks table
+-- ─── Tasks ────────────────────────────────────────────────────────────────────
+
 create table if not exists tasks (
   id uuid primary key default uuid_generate_v4(),
   title text not null,
   description text,
   assigned_to uuid references team_members(id) on delete set null,
+  work_category_id uuid references work_categories(id) on delete set null,
   priority text not null default 'medium' check (priority in ('low', 'medium', 'high', 'critical')),
   status text not null default 'open' check (status in ('open', 'in_progress', 'completed', 'overdue')),
   price_impact numeric(10, 2) not null default 0,
@@ -42,7 +58,8 @@ create table if not exists tasks (
   due_date timestamptz
 );
 
--- Ticker events feed (live activity log)
+-- ─── Ticker Events ────────────────────────────────────────────────────────────
+
 create table if not exists ticker_events (
   id uuid primary key default uuid_generate_v4(),
   member_id uuid not null references team_members(id) on delete cascade,
@@ -54,7 +71,8 @@ create table if not exists ticker_events (
   created_at timestamptz not null default now()
 );
 
--- Indexes
+-- ─── Indexes ──────────────────────────────────────────────────────────────────
+
 create index if not exists idx_price_history_member_id on price_history(member_id);
 create index if not exists idx_price_history_recorded_at on price_history(recorded_at desc);
 create index if not exists idx_tasks_assigned_to on tasks(assigned_to);
@@ -62,52 +80,60 @@ create index if not exists idx_tasks_status on tasks(status);
 create index if not exists idx_ticker_events_member_id on ticker_events(member_id);
 create index if not exists idx_ticker_events_created_at on ticker_events(created_at desc);
 
--- Updated_at trigger
+-- ─── updated_at trigger ───────────────────────────────────────────────────────
+
 create or replace function update_updated_at_column()
 returns trigger as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
+begin new.updated_at = now(); return new; end;
 $$ language plpgsql;
 
 create trigger update_team_members_updated_at
   before update on team_members
   for each row execute function update_updated_at_column();
 
--- Seed some demo data
-insert into team_members (name, role, avatar_seed, current_price, base_price, open_tasks, completed_tasks, streak)
-values
-  ('Alex Chen', 'Frontend Engineer', 'alex', 142.50, 100.00, 3, 12, 5),
-  ('Priya Sharma', 'Backend Engineer', 'priya', 198.75, 100.00, 5, 28, 8),
-  ('Jordan Lee', 'Full Stack Engineer', 'jordan', 87.30, 100.00, 1, 7, 2),
-  ('Sam Rivera', 'DevOps Engineer', 'sam', 165.20, 100.00, 4, 19, 6),
-  ('Casey Morgan', 'Designer', 'casey', 110.00, 100.00, 2, 9, 3);
+-- ─── Seed: Work Categories ────────────────────────────────────────────────────
 
--- Seed price history for each member
-insert into price_history (member_id, price, event_type, recorded_at)
-select
-  m.id,
-  prices.price,
-  prices.event_type,
-  now() - (interval '1 day' * prices.days_ago)
-from team_members m
-cross join lateral (
-  values
-    (100.00::numeric, 'initial'::text, 10),
-    (105.00::numeric, 'assigned'::text, 9),
-    (102.00::numeric, 'completed'::text, 8),
-    (110.00::numeric, 'assigned'::text, 7),
-    (115.00::numeric, 'streak'::text, 6),
-    (112.00::numeric, 'assigned'::text, 5),
-    (120.00::numeric, 'completed'::text, 4),
-    (118.00::numeric, 'assigned'::text, 3),
-    (125.00::numeric, 'completed'::text, 2),
-    (m.current_price, 'assigned'::text, 0)
-) as prices(price, event_type, days_ago)
+insert into work_categories (name, emoji, description, base_multiplier, color) values
+  ('Code Review',   '🔍', 'Reviewing PRs, pair programming and code quality',   1.3, 'indigo'),
+  ('Frontend Dev',  '🖥️', 'UI implementation, components, styling',             1.0, 'blue'),
+  ('Backend Dev',   '⚙️', 'APIs, databases, services, business logic',          1.2, 'violet'),
+  ('Design Work',   '🎨', 'UI/UX design, mockups, prototypes, design systems',  1.1, 'pink'),
+  ('Architecture',  '🏗️', 'System design, tech decisions, ADRs',                1.5, 'amber'),
+  ('DevOps',        '🚀', 'CI/CD pipelines, infrastructure, deployments',       1.4, 'emerald'),
+  ('Bug Fix',       '🐛', 'Diagnosing and fixing defects',                       1.1, 'red'),
+  ('Documentation', '📚', 'Docs, runbooks, wikis, READMEs',                     0.8, 'zinc')
 on conflict do nothing;
 
--- Enable realtime on key tables
+-- ─── Seed: Team Members ───────────────────────────────────────────────────────
+
+insert into team_members (name, role, avatar_seed, current_price, base_price, open_tasks, completed_tasks, streak) values
+  ('Alex Chen',    'Frontend Engineer',    'alex',   142.50, 100.00, 3, 12, 5),
+  ('Priya Sharma', 'Backend Engineer',     'priya',  198.75, 100.00, 5, 28, 8),
+  ('Jordan Lee',   'Full Stack Engineer',  'jordan',  87.30, 100.00, 1,  7, 2),
+  ('Sam Rivera',   'DevOps Engineer',      'sam',    165.20, 100.00, 4, 19, 6),
+  ('Casey Morgan', 'Product Designer',     'casey',  110.00, 100.00, 2,  9, 3);
+
+-- ─── Seed: Price History ─────────────────────────────────────────────────────
+
+insert into price_history (member_id, price, event_type, recorded_at)
+select m.id, p.price, p.event_type, now() - (interval '1 hour' * p.hours_ago)
+from team_members m
+cross join lateral (values
+  (100.00::numeric, 'initial'::text, 240),
+  (105.00::numeric, 'assigned'::text, 210),
+  (102.00::numeric, 'completed'::text, 180),
+  (110.00::numeric, 'assigned'::text, 150),
+  (115.00::numeric, 'streak'::text, 120),
+  (112.00::numeric, 'assigned'::text, 90),
+  (120.00::numeric, 'completed'::text, 60),
+  (118.00::numeric, 'assigned'::text, 30),
+  (125.00::numeric, 'completed'::text, 10),
+  (m.current_price, 'assigned'::text, 0)
+) as p(price, event_type, hours_ago);
+
+-- ─── Realtime ─────────────────────────────────────────────────────────────────
+
 alter publication supabase_realtime add table team_members;
 alter publication supabase_realtime add table ticker_events;
 alter publication supabase_realtime add table tasks;
+alter publication supabase_realtime add table work_categories;

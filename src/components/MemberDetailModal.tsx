@@ -17,7 +17,7 @@ import Avatar from './ui/Avatar'
 interface MemberDetailModalProps {
   member: MemberWithHistory
   onClose: () => void
-  onAssign: () => void
+  onAssign?: () => void
 }
 
 export default function MemberDetailModal({
@@ -137,14 +137,16 @@ export default function MemberDetailModal({
             ))}
           </div>
 
-          {/* Assign button */}
-          <button
-            onClick={() => { onClose(); onAssign() }}
-            className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl transition-colors text-sm"
-          >
-            <Plus className="w-4 h-4" />
-            Assign a task to {member.name.split(' ')[0]}
-          </button>
+          {/* Assign button — manager only */}
+          {onAssign && (
+            <button
+              onClick={() => { onClose(); onAssign() }}
+              className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl transition-colors text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Assign work to {member.name.split(' ')[0]}
+            </button>
+          )}
         </div>
       </div>
     </div>
