@@ -15,8 +15,9 @@ import ActivityFeed from '@/components/ActivityFeed'
 import MarketHeader from '@/components/MarketHeader'
 import MemberCard from '@/components/MemberCard'
 import MemberDetailModal from '@/components/MemberDetailModal'
+import { isConfigured } from '@/lib/supabase'
 
-const IS_MOCK = !process.env.NEXT_PUBLIC_SUPABASE_URL
+const IS_MOCK = !isConfigured
 
 type Tab = 'overview' | 'team' | 'categories'
 

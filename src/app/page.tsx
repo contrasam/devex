@@ -15,8 +15,9 @@ import ActivityFeed from '@/components/ActivityFeed'
 import TaskList from '@/components/TaskList'
 import MarketHeader from '@/components/MarketHeader'
 import RoleGate from '@/components/RoleGate'
+import { isConfigured } from '@/lib/supabase'
 
-const IS_MOCK = !process.env.NEXT_PUBLIC_SUPABASE_URL
+const IS_MOCK = !isConfigured
 
 export default function Home() {
   const { role, ready, setRole, clearRole, isManager } = useRole()

@@ -2,15 +2,16 @@ import { createClient } from '@supabase/supabase-js'
 import type { TeamMember, Task, PriceHistory, TickerEvent, MemberWithHistory, Priority, WorkCategory } from '@/types'
 import { calculateImpact, PRICE_IMPACT } from '@/types'
 
-// Lazy-initialize so module evaluation doesn't throw when env vars are absent.
-// All callers are guarded by IS_MOCK checks before this module is imported.
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-export const supabase =
-  supabaseUrl && supabaseAnonKey
-    ? createClient(supabaseUrl, supabaseAnonKey)
-    : (null as unknown as ReturnType<typeof createClient>)
+// Derived here — where the env vars are actually read — so pages don't have to
+// re-check process.env, which Turbopack may not inline reliably at runtime.
+export const isConfigured = Boolean(supabaseUrl && supabaseAnonKey)
+
+export const supabase = isConfigured
+  ? createClient(supabaseUrl!, supabaseAnonKey!)
+  : (null as unknown as ReturnType<typeof createClient>)
 
 // ─── Work Categories ──────────────────────────────────────────────────────────
 
